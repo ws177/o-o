@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# 预览页是生成产物（引擎在 engine/json + 生成器里），不算项目语言
+preview/o-o.html linguist-detectable=false
