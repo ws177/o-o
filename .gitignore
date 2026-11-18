@@ -1,0 +1,37 @@
+# ── 工具链与依赖（几百 MB，各自本地装） ──
+.tools/
+esp-idf-v6.1.1/
+esp-idf-*.zip
+eim-gui-*.exe
+
+# ── 构建产物 ──
+firmware/build/
+firmware/sdkconfig
+firmware/sdkconfig.old
+*.bin
+*.elf
+*.map
+
+# ── 本机密凭据（只提交 example） ──
+firmware/main/wifi_creds.h
+
+# ── 厂商版权代码（不能随项目分发，按 README 自行下载） ──
+vendor/
+
+# ── DSH 记忆插件数据 ──
+.dsh-meow/
+
+# ── 抓取素材的中间产物 ──
+docs/cap/
+docs/ouo/
+docs/ouo_render/
+docs/circle/
+docs/poses/
+docs/*_debug*.png
+
+# ── 杂项 ──
+__pycache__/
+*.pyc
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,117 @@
+{
+  "_comment": "O-O 引擎的唯一真相。改表情/节奏改这里，然后跑 tools/gen_engine.py 生成 C 和网页两侧。",
+
+  "protocol": {
+    "fields": ["t1L","t2L","angL","t1R","t2R","angR","sc","mChev","mOmega","mSmile","mBlob","lookX","lookY","tilt","shakeX","dim","power"],
+    "scale_1000": ["t1L","t2L","angL","t1R","t2R","angR","sc","mChev","mOmega","mSmile","mBlob","lookX","lookY","dim"],
+    "scale_10000": ["tilt","shakeX"],
+    "raw": ["power"]
+  },
+
+  "poses": {
+    "idle":     { "eye": [-1.05, 1.05, 0.00, 1.00], "mouth": { "chev": 1 } },
+    "blink":    { "eye": [ 0.15, 1.05, 0.00, 1.00], "mouth": { "chev": 1 } },
+    "happy":    { "eye": [-1.05, 0.03, 0.00, 1.00], "mouth": { "smile": 1 } },
+    "joy":      { "eye": [-1.05, -0.15, 0.00, 1.00], "mouth": { "smile": 1 } },
+    "ecstatic": { "eye": [-1.05, -0.38, 0.00, 1.02], "mouth": { "blob": 1 } },
+    "pet":      { "eye": [-1.05, 0.03, 0.00, 1.00], "mouth": { "omega": 1 } },
+    "annoyed":  { "eye": [-0.75,-0.45, 0.45, 1.00], "mouth": { "chev": 1 } },
+    "surprise": { "eye": [-1.10, 1.10, 0.00, 1.10], "mouth": { "blob": 1 } },
+
+    "sleepy":   { "eye": [ 0.35, 1.05, 0.00, 1.00], "mouth": { "chev": 1 },
+                  "_note": "上沿切掉大半，半阖" },
+    "asleep":   { "eye": [-0.05, 0.05, 0.00, 1.00], "mouth": { "chev": 1 },
+                  "_note": "合成一条细线" },
+    "confused": { "eye": [-1.05, 0.10, 0.00, 1.00],
+                  "eyeR": [-1.05, -0.15, 0.22, 0.94], "mouth": { "omega": 0.55, "chev": 0.45 },
+                  "_note": "右眼更眯、嘴歪" },
+    "numb":     { "eye": [-0.05, 0.05, 0.00, 1.00], "mouth": { "chev": 1 },
+                  "_note": "面无表情" },
+    "hurt":     { "eye": [-0.62, -0.18, 0.12, 1.00], "mouth": { "frown": 1 },
+                  "_note": "眼角下垂 + 撇嘴" },
+    "shy":      { "eye": [-1.05, 0.10, 0.00, 1.00], "mouth": { "omega": 0.70, "frown": 0.30 } },
+    "smug":     { "eye": [-1.05, -0.05, 0.10, 1.00], "mouth": { "smile": 0.80, "frown": 0.20 } },
+    "wink":     { "eye": [-1.05, 1.05, 0.00, 1.00],
+                  "eyeR": [-0.05, 0.05, 0.00, 1.00], "mouth": { "smile": 1 },
+                  "_note": "右眼闭、左眼睁开" },
+    "yawn":     { "eye": [-0.05, 0.05, 0.00, 1.00], "mouth": { "blob": 1 },
+                  "_note": "闭眼大张嘴" }
+  },
+
+  "blend": {
+    "annoyed":  { "gain": 1.4, "lo": 0.10, "hi": 0.55 },
+    "happy":    { "gain_cheek": 1.2, "gain_other": 0.35, "lo": 0.12, "hi": 0.55 },
+    "joy":      { "gain": 1.2, "lo": 0.35, "hi": 0.68 },
+    "ecstatic": { "gain": 1.3, "lo": 0.68, "hi": 0.96 },
+    "pet":      { "gain_pet": 1.2, "gain_other": 0.35, "lo": 0.12, "hi": 0.55 },
+    "surprise": { "gain": 1.4, "lo": 0.10, "hi": 0.55 },
+    "blink":    { "gain": 2.2 },
+    "idle_action": { "gain": 1.1 }
+  },
+
+  "timing": {
+    "decay": { "anger": 0.45, "happy": 0.55, "surprise": 2.4 },
+    "blink": { "down": 0.06, "hold": 0.10, "up": 0.22, "next_lo": 2.2, "next_hi": 5.5,
+               "_comment": "开心到 suppress_happy 以上就不自动眨眼（摸头时一直闭眼享受）",
+               "suppress_happy": 0.30 },
+    "idle":  { "next_lo": 1.2, "next_hi": 3.6 },
+    "react": { "hold": 0.90, "_comment": "反应动画时长" },
+    "linger": { "after_touch": 3.5, "_comment": "松手后保持当前表情多少秒，再开始往回走" },
+    "power": { "_moved": "见 timeline" },
+    "dim":   { "aod": 0.55, "rate": 6.0 }
+  },
+
+  "reaction": {
+    "eye":  { "annoyed": [0.00, 0.14, 1.6], "shake_amp": 0.006, "shake_freq": 70.0, "shake_decay": 9.0, "pop": [0.08, 0.35] },
+    "head": { "pet": [0.02, 0.55, 1.4] },
+    "chin": { "surprise": [0.00, 0.45, 1.5] }
+  },
+
+  "hold": {
+    "_comment": "按住不放时每秒的情绪增量，必须明显大于衰减速率，否则会互相抵消",
+    "eye_anger": 1.10,
+    "head_happy": 1.20,
+    "head_anger": 0.60,
+    "cheek_happy": 0.90,
+    "chin_surprise": 0.55
+  },
+
+  "smooth": {
+    "eye_freq": 22.0,
+    "look_freq": 18.0,
+    "tilt_freq": 9.0,
+    "mouth": { "omega": [20.0, 0.75], "blob": [22.0, 0.60], "smile": [18.0, 0.70] }
+  },
+
+  "idle_actions": {
+    "kinds": ["blink", "omega", "dome", "crescent", "look", "tilt", "squash"],
+    "durations": { "blink": 0.40, "omega": 0.90, "dome": 0.55, "crescent": 0.50, "look": 1.10, "tilt": 0.90, "squash": 0.45 }
+  },
+
+  "layout": {
+    "eye_r": 0.139, "eye_dx": 0.303, "eye_y": 0.417, "mouth_w": 0.1575, "mouth_y": 0.652
+  },
+
+  "mouth": {
+    "_comment": "chev_peak = 嘴的尖角高度。0 是横杠（默认 O-O 的样子），0.44 是尖角 ∧",
+    "chev_peak": 0.0
+  },
+
+  "timeline": {
+    "_comment": "待机时间表（秒）。清醒 -> 犯困 -> 睡着 -> 压暗 -> 休眠",
+    "sleepy_after": 45,
+    "asleep_after": 150,
+    "aod_after": 240,
+    "sleep_after": 600
+  },
+
+  "states": {
+    "_comment": "这些表情由状态自动触发，不是被戳出来的",
+    "numb":     { "pokes": 6, "window": 4.0, "_note": "这么多秒内被戳这么多次就麻木" },
+    "confused": { "pokes": 3, "window": 4.0 },
+    "shy":      { "lo": 0.20, "hi": 0.45, "_note": "开心值在这个区间=被轻摸，害羞" },
+    "smug":     { "lo": 0.80, "hi": 0.95 },
+    "hurt":     { "anger_from": 0.30, "idle_after": 2.0 },
+    "yawn":     { "chance": 0.35, "dur": 1.4 }
+  }
+}

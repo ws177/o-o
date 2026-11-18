@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>O-O</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: ui-sans-serif, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #c { display: block; width: 100%; height: 100%; touch-action: none; cursor: none; }
+  #c.debug { cursor: crosshair; }
+
+  #hint {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    padding: 8px 14px; border-radius: 999px; background: rgba(28,28,32,.8);
+    color: #8d8a99; font-size: 12px; white-space: nowrap; pointer-events: none;
+    transition: opacity 1s ease; z-index: 5;
+  }
+  #hint b { color: #e6e3f0; }
+  #hint.hide { opacity: 0; }
+
+  #btn { position: fixed; right: 16px; bottom: 14px; z-index: 9;
+    display: flex; gap: 6px; align-items: center;
+    padding: 10px; border: 0; background: transparent; cursor: pointer; }
+  #btn i { width: 7px; height: 7px; border-radius: 50%; background: #ffffff; opacity: .20;
+    transition: opacity .2s ease; }
+  #btn:hover i { opacity: .60; }
+  #btn.on i { opacity: .85; }
+
+  /* ── 设置页（黑底、白字、动画演示） ── */
+  #settings {
+    position: fixed; inset: 0; z-index: 20; display: none;
+    background: #000; color: #fff; overflow: auto;
+    padding: 34px 40px 30px;
+  }
+  #settings.show { display: block; }
+  #settings h1 { font-size: 40px; margin: 0 0 22px; letter-spacing: 1px; }
+  #settings .inner { max-width: 900px; margin: 0 auto; }
+  #settings .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+  #settings .card { background: #0b0b0f; border: 1px solid rgba(255,255,255,.07);
+    border-radius: 16px; padding: 20px 24px 24px; }
+  .cardtitle { font-size: 12.5px; color: #8e8b9b; letter-spacing: .6px; margin-bottom: 10px; }
+  .cardtitle.dev { color: #4fc98a; margin-top: 22px; }
+  @media (max-width: 820px) {
+    #settings .cards { grid-template-columns: 1fr; }
+  }
+
+  .opt { display: flex; align-items: center; gap: 14px; margin: 12px 0; font-size: 21px; cursor: pointer; user-select: none; }
+  .opt .box { width: 26px; height: 26px; border: 2px solid #fff; border-radius: 5px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; }
+  .opt.checked .box::after { content: '✓'; }
+  .opt:hover { opacity: .85; }
+
+  .moodrow { margin: 20px 0 8px; font-size: 21px; display: flex; align-items: center; gap: 14px; }
+  .moodrow input[type=range] { width: 260px; accent-color: #fff; }
+  .moodrow .emo { font-size: 19px; opacity: .75; }
+
+  #settings .close { position: fixed; right: 26px; bottom: 22px; }
+  #settings .close i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: .25; margin-left: 6px; }
+  #settings .foot { margin-top: 18px; font-size: 15px; color: #6a6a72; }
+
+  /* 设置页里藏着的开发者入口：几乎看不见，长按 10 秒
+     按住期间圆点会在 10 秒里慢慢变大变亮，作为进度提示 */
+  #devdot { position: fixed; left: 16px; bottom: 16px; width: 14px; height: 14px;
+    border-radius: 50%; background: #ffffff; opacity: .045; touch-action: none; }
+  #settings.dev #devdot { opacity: .30; }
+  #devdot.done { box-shadow: 0 0 12px 4px rgba(255,255,255,.55); }
+
+  /* 开发者模式：默认隐藏 */
+  .devonly { display: none; }
+  #settings.dev .devonly { display: block; }
+  #settings.dev h1::after { content: ' DEV'; color: #4fc98a; font-size: 18px; letter-spacing: 2px; }
+  .devtip { color: #4fc98a; font-size: 12px; margin: 14px 0 4px; opacity: .8; }
+
+  /* 待机时间表：一根按比例分段的横条 */
+  .tlbar { display: flex; height: 30px; border-radius: 7px; overflow: hidden;
+    width: 100%; background: #111; }
+  .tlseg { display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; color: #12121a; font-weight: 600; white-space: nowrap;
+    overflow: hidden; border-right: 1px solid rgba(0,0,0,.45); }
+  .tlseg:last-child { border-right: 0; }
+  .tlnote { font-size: 11px; color: #6a6a72; margin-top: 6px; }
+
+  #panel { position: fixed; right: 12px; top: 56px; width: 240px; z-index: 8; display: none;
+    padding: 11px 13px 12px; border-radius: 12px; background: rgba(18,18,22,.9);
+    border: 1px solid rgba(255,255,255,.07);
+    color: #cfccda; font: 11.5px/1.5 ui-monospace, monospace; }
+  #panel.show { display: block; }
+  .row { display: grid; grid-template-columns: 54px 1fr 34px; gap: 7px; align-items: center; margin-bottom: 4px; }
+  .row > span:first-child { color: #8e8b9b; }
+  .v { text-align: right; color: #b9b6c4; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #4fc98a; height: 13px; }
+  .tip { color: #6f6c7e; font-size: 10.5px; margin: 2px 0 6px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint"><b>戳眼睛</b> 生气 · <b>摸头</b> 开心 · 不管它，它自己会换表情</div>
+<button id="btn" title="设置（G）"><i></i><i></i><i></i></button>
+
+<div id="settings">
+  <div class="inner">
+    <h1>设置</h1>
+    <div class="cards">
+      <div class="card">
+        <div class="cardtitle">行为</div>
+        <div class="opt" data-k="lock"><span class="box"></span>锁住表情</div>
+        <div class="opt" data-k="moodStatic"><span class="box"></span>心情不再漂移</div>
+        <div class="opt" data-k="noStretch"><span class="box"></span>关掉嘴的拉伸</div>
+        <div class="opt" data-k="noWink"><span class="box"></span>关掉倾斜眨眼</div>
+        <div class="opt" data-k="noSleep"><span class="box"></span>防止待机休眠</div>
+
+        <div class="devonly">
+          <div class="cardtitle dev">开发者</div>
+          <div class="opt" data-k="debugHit"><span class="box"></span>显示触摸点与判定圈</div>
+          <div class="opt" data-k="debugHud"><span class="box"></span>显示帧率与状态</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardtitle">心情</div>
+        <div class="moodrow">
+          <span class="emo">☹</span>
+          <input id="mood" type="range" min="-100" max="100" value="0">
+          <span class="emo">☹</span>
+        </div>
+        <div class="foot">刻度只是心情底色，不影响被戳时的反应。</div>
+
+        <div class="cardtitle" style="margin-top:26px;">待机时间表</div>
+        <div class="tlbar" id="tlbar"></div>
+      </div>
+    </div>
+  </div>
+  <button id="btnClose" class="close" title="关闭"><i></i><i></i><i></i></button>
+  <div id="devdot"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════════
+     O-O —— 只有黑白两色
+       眼睛 = 实心圆 ∩ 可旋转眼皮带（t1/t2 两条边，ang 倾角）
+       嘴   = 一条闭合多边形，在 ∧ / ω / ∪ / 团 之间按权重插值
+       表情 = 一张姿态表，情绪只决定权重
+       动画 = 弹簧（会过冲回弹）+ 空闲时自己排节目
+     ═══════════════════════════════════════════════════════════════ */
+
+  const INK = '#ffffff';
+  const BG = '#000000';
+
+  // 下面这段由 tools/gen_engine.py 从 engine/engine.json 生成，勿手改
+  // <<<GEN_BEGIN>>>
+  const CFG = {
+    eyeR: 0.139, eyeDX: 0.303, eyeY: 0.417, mouthW: 0.1575, mouthY: 0.652,
+    idleMin: 1.2, idleMax: 3.6,
+  };
+
+  const POSES = {
+    idle     : { eye: { t1: -1.05, t2: 1.05, ang: 0.0, sc: 1.0 }, mouth: { chev: 1 } },
+    blink    : { eye: { t1: 0.15, t2: 1.05, ang: 0.0, sc: 1.0 }, mouth: { chev: 1 } },
+    happy    : { eye: { t1: -1.05, t2: 0.03, ang: 0.0, sc: 1.0 }, mouth: { smile: 1 } },
+    pet      : { eye: { t1: -1.05, t2: 0.03, ang: 0.0, sc: 1.0 }, mouth: { omega: 1 } },
+    annoyed  : { eye: { t1: -0.75, t2: -0.45, ang: 0.45, sc: 1.0 }, mouth: { chev: 1 } },
+    surprise : { eye: { t1: -1.1, t2: 1.1, ang: 0.0, sc: 1.1 }, mouth: { blob: 1 } },
+    sleepy   : { eye: { t1: 0.35, t2: 1.05, ang: 0.0, sc: 1.0 }, mouth: { chev: 1 } },
+    joy      : { eye: { t1: -1.05, t2: -0.15, ang: 0.0, sc: 1.0 }, mouth: { smile: 1 } },
+    ecstatic : { eye: { t1: -1.05, t2: -0.38, ang: 0.0, sc: 1.02 }, mouth: { blob: 1 } },
+    asleep   : { eye: { t1: -0.05, t2: 0.05, ang: 0.0, sc: 1.0 }, mouth: { chev: 1 } },
+    confused : { eye: { t1: -1.05, t2: 0.1, ang: 0.0, sc: 1.0 }, eyeR: { t1: -1.05, t2: -0.15, ang: 0.22, sc: 0.94 }, mouth: { omega: 0.55, chev: 0.45 } },
+    numb     : { eye: { t1: -0.05, t2: 0.05, ang: 0.0, sc: 1.0 }, mouth: { chev: 1 } },
+    hurt     : { eye: { t1: -0.62, t2: -0.18, ang: 0.12, sc: 1.0 }, mouth: { frown: 1 } },
+    shy      : { eye: { t1: -1.05, t2: 0.1, ang: 0.0, sc: 1.0 }, mouth: { omega: 0.7, frown: 0.3 } },
+    smug     : { eye: { t1: -1.05, t2: -0.05, ang: 0.1, sc: 1.0 }, mouth: { smile: 0.8, frown: 0.2 } },
+    wink     : { eye: { t1: -1.05, t2: 1.05, ang: 0.0, sc: 1.0 }, eyeR: { t1: -0.05, t2: 0.05, ang: 0.0, sc: 1.0 }, mouth: { smile: 1 } },
+    yawn     : { eye: { t1: -0.05, t2: 0.05, ang: 0.0, sc: 1.0 }, mouth: { blob: 1 } },
+  };
+
+  const TIMING = {
+    decay: { anger: 0.45, happy: 0.55, surprise: 2.4 },
+    blink: { down: 0.06, hold: 0.1, up: 0.22, nextLo: 2.2, nextHi: 5.5 },
+    react: { hold: 0.9 },
+    linger: { afterTouch: 3.5 },
+    power: { aodAfter: 240, sleepAfter: 600 },
+    dim: { aod: 0.55, rate: 6.0 },
+    blend: {
+      annoyed: { gain: 1.4, lo: 0.1, hi: 0.55 },
+      happy: { gain: 0.35, lo: 0.12, hi: 0.55 },
+      joy: { gain: 1.2, lo: 0.35, hi: 0.68 },
+      ecstatic: { gain: 1.3, lo: 0.68, hi: 0.96 },
+      pet: { gain: 1.2, lo: 0.12, hi: 0.55 },
+      surprise: { gain: 1.4, lo: 0.1, hi: 0.55 },
+      blink: { gain: 2.2, lo: 0.0, hi: 1.0 },
+      idleAction: { gain: 1.1, lo: 0.0, hi: 1.0 },
+    },
+    reactBlend: {
+      eye: { pose: 'annoyed', lo: 0.0, hi: 0.14, gain: 1.6 },
+      head: { pose: 'pet', lo: 0.02, hi: 0.55, gain: 1.4 },
+      chin: { pose: 'surprise', lo: 0.0, hi: 0.45, gain: 1.5 },
+    },
+    smooth: { eyeFreq: 22.0, lookFreq: 18.0, tiltFreq: 9.0,
+      omega: [20.0, 0.75], blob: [22.0, 0.6], smile: [18.0, 0.7] },
+  };
+
+  const IDLE_KINDS = ["blink", "omega", "dome", "crescent", "look", "tilt", "squash"];
+  const IDLE_DUR = {"blink": 0.4, "omega": 0.9, "dome": 0.55, "crescent": 0.5, "look": 1.1, "tilt": 0.9, "squash": 0.45};
+  const MOUTH_CHEV_PEAK = 0.0;
+  const BLINK_SUPPRESS_HAPPY = 0.3;
+  const STATES = {"numb": {"pokes": 6, "window": 4.0, "_note": "\u8fd9\u4e48\u591a\u79d2\u5185\u88ab\u6233\u8fd9\u4e48\u591a\u6b21\u5c31\u9ebb\u6728"}, "confused": {"pokes": 3, "window": 4.0}, "shy": {"lo": 0.2, "hi": 0.45, "_note": "\u5f00\u5fc3\u503c\u5728\u8fd9\u4e2a\u533a\u95f4=\u88ab\u8f7b\u6478\uff0c\u5bb3\u7f9e"}, "smug": {"lo": 0.8, "hi": 0.95}, "hurt": {"anger_from": 0.3, "idle_after": 2.0}, "yawn": {"chance": 0.35, "dur": 1.4}};
+  const TIMELINE = {"sleepy_after": 45, "asleep_after": 150, "aod_after": 240, "sleep_after": 600};
+  // <<<GEN_END>>>
+
+  const MOUTH_KEYS = ['chev', 'omega', 'smile', 'blob', 'frown'];
+
+  /* ── 小工具 ───────────────────────────────────────────── */
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const smoothstep = (v, a, b) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pulse = (u, a, b) => (u < a || u > b) ? 0 : Math.sin(Math.PI * (u - a) / (b - a));
+
+  const VEL = {};
+  function spr(key, target, dt, freq, damp) {
+    const k = freq * freq, c = 2 * damp * freq;
+    let x = S[key], v = VEL[key] || 0;
+    let rem = dt;
+    while (rem > 1e-6) {
+      const h = Math.min(rem, 1 / 240);
+      v += (-k * (x - target) - c * v) * h;
+      x += v * h;
+      rem -= h;
+    }
+    VEL[key] = v; S[key] = x;
+  }
+
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d', { alpha: false });
+  let W = 0, H = 0, DPR = 1, R = 0;
+  let fpsAcc = 0, fpsN = 0, fpsShown = 0;
+
+  /* 是不是触摸屏：是的话手指本身就是触点，不用画；鼠标才需要画一个白点 */
+  const IS_TOUCH = ('ontouchstart' in window) ||
+                   ((typeof navigator !== 'undefined' && navigator.maxTouchPoints) || 0) > 0;
+
+  const S = {
+    t: 0, lastInput: 0, power: 'ACTIVE',
+    anger: 0, happy: 0, surprise: 0, happyKind: '',
+
+    blinkT: -1, blinkNext: 2.0, blinkLid: 0,
+
+    /* 左/右眼当前形状（弹簧输出） */
+    eL: { t1: -1.05, t2: 1.05, ang: 0, sc: 1 },
+    eR: { t1: -1.05, t2: 1.05, ang: 0, sc: 1 },
+
+    /* 嘴的五种权重 */
+    mOmega: 0, mBlob: 0, mSmile: 0, mFrown: 0,
+
+    eyeX: 0, eyeY: 0, tilt: 0, shakeX: 0, dim: 0,
+
+    /* 手指靠近时每只眼睛各自躲开 */
+    avLx: 0, avLy: 0, avRx: 0, avRy: 0,
+    dL: 0, dR: 0, dkL: 0, dkR: 0,      /* 触点凹陷：方向角与深度 */
+
+    react: { t: -1, kind: '' },
+    idle: { next: 1.8, kind: '', t: -1, dur: 0 },
+
+    /* 持续触摸 */
+    hold: { active: false, region: '', x: 0, y: 0, nextSend: 0 },
+    emotionHold: 0,      /* 松手后保持表情的剩余秒数 */
+    afterglow: 0,        /* 摸完头的余韵剩余秒数 */
+    slowBlink: 0,        /* 余韵里的慢眨眼闭合度 */
+
+    mouseX: 0, mouseY: 0, mouseActive: false,
+    debug: false,
+    mood: 0,          /* 持久心情：-1 难过 .. +1 生气 */
+    muted: false,
+    lastClickMs: 0,
+    previewPose: '',  /* 开发者预览：显示指定姿态 */
+  };
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight; R = Math.min(W, H);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  function layout() {
+    return {
+      cx: W / 2, cy: H * CFG.eyeY, my: H * CFG.mouthY,
+      dx: CFG.eyeDX * W, er: CFG.eyeR * R, mw: CFG.mouthW * W * 0.5,
+    };
+  }
+
+  /* ── 姿态混合（左右眼分开，五路嘴型） ─────────────────── */
+  function blend(weights) {
+    const eL = { t1: 0, t2: 0, ang: 0, sc: 0 };
+    const eR = { t1: 0, t2: 0, ang: 0, sc: 0 };
+    const m = {};
+    for (const k of MOUTH_KEYS) m[k] = 0;
+    let sum = 0;
+    for (const k in weights) {
+      const wt = weights[k];
+      if (!(wt > 0)) continue;
+      const p = POSES[k];
+      if (!p) continue;
+      sum += wt;
+      const a = p.eye, b = p.eyeR;
+      eL.t1 += a.t1 * wt; eL.t2 += a.t2 * wt; eL.ang += a.ang * wt; eL.sc += a.sc * wt;
+      if (b) {
+        eR.t1 += b.t1 * wt; eR.t2 += b.t2 * wt; eR.ang += b.ang * wt; eR.sc += b.sc * wt;
+      } else {
+        /* 没有单独指定右眼时镜像（两只眼朝同一方向倾斜） */
+        eR.t1 += a.t1 * wt; eR.t2 += a.t2 * wt; eR.ang += -a.ang * wt; eR.sc += a.sc * wt;
+      }
+      for (const mk of MOUTH_KEYS) m[mk] += (p.mouth[mk] || 0) * wt;
+    }
+    if (sum <= 0) return null;
+    for (const f of ['t1', 't2', 'ang', 'sc']) { eL[f] /= sum; eR[f] /= sum; }
+    for (const k of MOUTH_KEYS) m[k] /= sum;
+    return { eL: eL, eR: eR, m: m };
+  }
+
+  /* ── 行为 ─────────────────────────────────────────────── */
+  function startIdle() {
+    const k = IDLE_KINDS[(Math.random() * IDLE_KINDS.length) | 0];
+    S.idle.kind = k;
+    S.idle.t = 0;
+    S.idle.dur = IDLE_DUR[k] || 0.6;
+    if (k === 'blink') S.blinkT = 0;
+    if (k === 'look') { S.gazeX = rand(-1, 1); S.gazeY = rand(-0.6, 0.6); }
+    S.idle.next = rand(CFG.idleMin, CFG.idleMax);
+  }
+
+  /* ── 传感器事件 ──────────────────────────────────────────
+     pickup  被拿起来：长时间没理 / 在睡觉时被抓起来会"惊醒"
+     shake   被摇晃：先惊后恼
+     cover   光被盖住：加速进入犯困
+     ─────────────────────────────────────────────────────── */
+  function sensorEvent(kind) {
+    if (kind === 'pickup') {
+      const idleFor = S.t - S.lastInput;
+      const wasDown = S.power !== 'ACTIVE' || idleFor > TIMELINE.sleepy_after * 0.6;
+      S.react.t = 0;
+      S.react.kind = 'pickup';
+      S.surprise = wasDown ? 1.0 : 0.45;      /* 睡着了被抓起 → 惊得更大 */
+      S.lastInput = S.t;
+      S.emotionHold = TIMING.linger.afterTouch;
+      S.power = 'ACTIVE';
+    } else if (kind === 'shake') {
+      S.react.t = 0;
+      S.react.kind = 'shake';
+      S.anger = clamp(S.anger + 0.35, 0, 1);
+      S.surprise = 0.7;
+      S.lastInput = S.t;
+      S.emotionHold = TIMING.linger.afterTouch;
+      S.power = 'ACTIVE';
+    } else if (kind === 'cover') {
+      /* 光被盖住：让它更快犯困（把待机计时往前推） */
+      S.lastInput = Math.min(S.lastInput, S.t - TIMELINE.sleepy_after * 0.8);
+    }
+  }
+
+  function poke(kind, px, py) {
+    S.lastInput = S.t;
+    S.power = 'ACTIVE';
+    S.emotionHold = TIMING.linger.afterTouch;   /* 松手后再保持几秒 */
+    S.pokes = (S.pokes || []).slice(-24);
+    S.pokes.push(S.t);
+    S.react.t = 0;
+    S.react.kind = kind;
+    S.react.gx = clamp((px - W / 2) / (W * 0.5), -1, 1);
+    S.react.gy = clamp((py - H / 2) / (H * 0.5), -1, 1);
+    if (kind === 'eye') { S.anger = clamp(S.anger + 0.55, 0, 1); S.happy = 0; S.happyKind = ''; }
+    else if (kind === 'head') { S.happy = clamp(S.happy + 0.55, 0, 1); S.anger = clamp(S.anger - 0.5, 0, 1); S.happyKind = 'pet'; }
+    else if (kind === 'cheek') { S.happy = clamp(S.happy + 0.30, 0, 1); S.happyKind = 'cheek'; }
+    else if (kind === 'chin' || kind === 'mouth') { S.surprise = 1; }
+  }
+
+  /* 触摸判定：眼睛是「大触摸球」，嘴也是独立的球，其余按上下分区 */
+  const HIT_EYE = 2.20;    /* 眼半径的倍数：靠近眼睛就算戳到 */
+  const HIT_MOUTH = 1.25;  /* 嘴宽的一半的倍数 */
+
+  function regionAt(px, py) {
+    const L = layout();
+    for (const side of [-1, 1]) {
+      if (Math.hypot(px - (L.cx + side * L.dx), py - L.cy) < L.er * HIT_EYE) return 'eye';
+    }
+    if (Math.hypot(px - L.cx, py - L.my) < L.mw * HIT_MOUTH) return 'mouth';
+    if (py < L.cy - L.er * 0.6) return 'head';
+    if (py > L.my - L.mw * 0.4) return 'chin';
+    return 'cheek';
+  }
+
+  /* ── 每帧 ─────────────────────────────────────────────── */
+  function update(dt) {
+    S.t += dt;
+    const idleSec = S.t - S.lastInput;
+    const sleepAfter = OPT.noSleep ? 1e9 : TIMING.power.sleepAfter;
+    const aodAfter = OPT.noSleep ? 1e9 : TIMING.power.aodAfter;
+    S.power = idleSec > sleepAfter ? 'SLEEP'
+            : idleSec > aodAfter ? 'AOD' : 'ACTIVE';
+
+    if (OPT.lock) { S.anger = 0; S.happy = 0; S.surprise = 0; }
+
+    /* 松手后先保持当前表情几秒，再往回走 */
+    if (S.hold.active) S.emotionHold = TIMING.linger.afterTouch;
+    else if (S.emotionHold > 0) S.emotionHold -= dt;
+
+    const fading = S.emotionHold <= 0 && !S.hold.active;
+    if (fading) {
+      S.anger = clamp(S.anger - TIMING.decay.anger * dt, 0, 1);
+      S.happy = clamp(S.happy - TIMING.decay.happy * dt, 0, 1);
+      S.surprise = clamp(S.surprise - TIMING.decay.surprise * dt, 0, 1);
+    }
+
+    /* 持续触摸：按住不放会一直有影响（速率要大于自然消退，否则会互相抵消） */
+    if (S.hold.active) {
+      S.lastInput = S.t;
+      S.power = 'ACTIVE';
+      const hr = S.hold.region;
+      if (hr === 'eye') {
+        S.anger = clamp(S.anger + 1.10 * dt, 0, 1);
+        S.happy = 0; S.happyKind = '';
+      } else if (hr === 'head') {
+        S.happy = clamp(S.happy + 1.20 * dt, 0, 1);
+        S.anger = clamp(S.anger - 0.60 * dt, 0, 1);
+        S.happyKind = 'pet';
+      } else if (hr === 'cheek') {
+        S.happy = clamp(S.happy + 0.90 * dt, 0, 1);
+        S.happyKind = 'cheek';
+      } else if (hr === 'chin' || hr === 'mouth') {
+        S.surprise = Math.max(S.surprise, 0.55);
+      }
+    }
+
+    /* 眨眼：摸头/很开心的时候不眨，一直眯着眼享受 */
+    const B = TIMING.blink;
+    if (S.hold.active || S.happy > BLINK_SUPPRESS_HAPPY) {
+      S.blinkT = -1;
+      S.blinkLid = 0;
+      if (S.blinkNext < 0.6) S.blinkNext = rand(0.6, 1.4);
+    } else if (S.blinkT < 0) {
+      S.blinkNext -= dt;
+      if (S.blinkNext <= 0) { S.blinkT = 0; S.blinkNext = rand(B.nextLo, B.nextHi); }
+    } else {
+      S.blinkT += dt;
+      const d = S.blinkT;
+      if (d < B.down) S.blinkLid = d / B.down;
+      else if (d < B.down + B.hold) S.blinkLid = 1;
+      else if (d < B.down + B.hold + B.up) S.blinkLid = 1 - (d - B.down - B.hold) / B.up;
+      else { S.blinkLid = 0; S.blinkT = -1; }
+    }
+
+    /* 空闲：一直在动 */
+    if (S.power === 'ACTIVE' && !OPT.lock) {
+      if (S.idle.t < 0) {
+        S.idle.next -= dt;
+        if (S.idle.next <= 0) startIdle();
+      } else {
+        S.idle.t += dt;
+        if (S.idle.t > S.idle.dur) { S.idle.t = -1; S.idle.kind = ''; }
+      }
+    }
+    if (S.react.t >= 0) { S.react.t += dt; if (S.react.t > TIMING.react.hold) S.react.t = -1; }
+
+    const idleW = (S.idle.t >= 0 && S.idle.dur > 0)
+      ? Math.sin(Math.PI * clamp(S.idle.t / S.idle.dur, 0, 1)) : 0;
+
+    /* ── 姿态权重 ──
+       先把情绪/事件的权重算出来，idle 让位：情绪越强，idle 越退。
+       这样强情绪能拿到接近 100% 的姿态。 */
+    const w = {};
+    const add = (k, v) => { if (v > 0.001) w[k] = (w[k] || 0) + v; };
+
+    const BB = TIMING.blend;
+    add('annoyed', smoothstep(S.anger, BB.annoyed.lo, BB.annoyed.hi) * BB.annoyed.gain);
+    add('happy', smoothstep(S.happy, BB.happy.lo, BB.happy.hi) * (S.happyKind === 'cheek' ? BB.pet.gain : BB.happy.gain));
+    add('joy', smoothstep(S.happy, BB.joy.lo, BB.joy.hi) * BB.joy.gain);
+    add('ecstatic', smoothstep(S.happy, BB.ecstatic.lo, BB.ecstatic.hi) * BB.ecstatic.gain);
+    add('pet', smoothstep(S.happy, BB.pet.lo, BB.pet.hi) * (S.happyKind === 'pet' ? BB.pet.gain : BB.happy.gain));
+    add('surprise', smoothstep(S.surprise, BB.surprise.lo, BB.surprise.hi) * BB.surprise.gain);
+    /* 眨眼不再参与姿态混合：它由 drawEye 直接叠加，见那里的注释 */
+    /* 空闲小动作 */
+    if (S.idle.kind === 'dome') add('happy', idleW * BB.idleAction.gain);
+    if (S.idle.kind === 'crescent') add('annoyed', idleW * BB.idleAction.gain);
+
+    /* 被戳的反应 */
+    if (S.react.t >= 0) {
+      const u = S.react.t;
+      const RB = TIMING.reactBlend;
+      if (S.react.kind === 'eye') add('annoyed', pulse(u, RB.eye.lo, RB.eye.hi) * RB.eye.gain);
+      if (S.react.kind === 'head') add('pet', pulse(u, RB.head.lo, RB.head.hi) * RB.head.gain);
+      if (S.react.kind === 'chin' || S.react.kind === 'mouth') add('surprise', pulse(u, RB.chin.lo, RB.chin.hi) * RB.chin.gain);
+      if (S.react.kind === 'pickup') add('surprise', pulse(u, 0.0, 0.55) * 1.8);
+      if (S.react.kind === 'shake') add('annoyed', pulse(u, 0.0, 0.60) * 1.3);
+    }
+
+    /* 持久心情：底子会影响它闲着时候的样子 */
+    if (S.mood > 0.01) add('annoyed', S.mood * 0.6);
+    else if (S.mood < -0.01) add('sleepy', -S.mood * 0.6);
+
+    /* ── 状态表情：没人理会困、会睡；被戳太多会麻木；轻摸会害羞 ── */
+    {
+      const idleSec2 = S.t - S.lastInput;
+      const ST = STATES, TL = TIMELINE;
+      const wSleepy = smoothstep(idleSec2, TL.sleepy_after, TL.sleepy_after + 12);
+      const wAsleep = smoothstep(idleSec2, TL.asleep_after, TL.asleep_after + 8);
+      add('sleepy', wSleepy * (1 - wAsleep) * 2.0);   /* 睡着时不再叠加犯困 */
+      add('asleep', wAsleep * 3.0);
+
+      /* 近期被戳次数 */
+      S.pokes = (S.pokes || []).filter((t) => S.t - t < ST.numb.window);
+      const np = S.pokes.length;
+      add('confused', smoothstep(np, ST.confused.pokes - 0.5, ST.confused.pokes + 0.5)
+                      * (1 - smoothstep(np, ST.numb.pokes - 0.5, ST.numb.pokes + 0.5)) * 1.8);
+
+      /* 麻木 = 什么都不在乎了，把其它情绪一并压下去 */
+      const wNumb = smoothstep(np, ST.numb.pokes - 0.5, ST.numb.pokes + 0.5);
+      if (wNumb > 0.01) {
+        const mute = 1 - 0.92 * wNumb;
+        for (const key of ['annoyed', 'happy', 'joy', 'ecstatic', 'pet', 'surprise',
+                           'hurt', 'shy', 'smug', 'confused']) {
+          if (w[key]) w[key] *= mute;
+        }
+        add('numb', 3.0 * wNumb);
+      }
+
+      /* 轻摸（开心值低区间）会害羞；摸太久会得意 */
+      add('shy', smoothstep(S.happy, ST.shy.lo, ST.shy.hi)
+                 * (1 - smoothstep(S.happy, ST.smug.lo, ST.smug.hi)) * 0.9);
+      add('smug', smoothstep(S.happy, ST.smug.lo, ST.smug.hi) * 0.9);
+
+      /* 生气了但没人理 → 委屈 */
+      add('hurt', smoothstep(S.anger, ST.hurt.anger_from, ST.hurt.anger_from + 0.3)
+                  * smoothstep(S.t - S.lastInput, ST.hurt.idle_after, ST.hurt.idle_after + 2) * 0.8);
+    }
+
+    /* ── 摸完头的余韵：慢慢眨一次眼 + ω 嘴 ── */
+    if (S.afterglow > 0) {
+      S.afterglow -= dt;
+      const u = clamp(1 - S.afterglow / 2.6, 0, 1);
+      if (u < 0.20) S.slowBlink = smoothstep(u, 0.02, 0.20);
+      else if (u < 0.45) S.slowBlink = 1;
+      else S.slowBlink = 1 - smoothstep(u, 0.45, 0.95);
+      add('pet', 1.2);          /* ω 嘴 + ∩ 眼，配合慢眨像是舒服地闭眼 */
+    } else {
+      S.slowBlink = 0;
+    }
+
+    let maxOther = 0;
+    for (const k in w) if (w[k] > maxOther) maxOther = w[k];
+    w.idle = Math.max(0, 1.0 - Math.min(maxOther, 1.0));
+
+    const bl = blend(w);
+    /* 预览：直接顶掉混合结果 */
+    let eyeL = bl ? bl.eL : { t1: -1.05, t2: 1.05, ang: 0, sc: 1 };
+    let eyeR = bl ? bl.eR : { t1: -1.05, t2: 1.05, ang: 0, sc: 1 };
+    let mouth = bl ? bl.m : { chev: 1, omega: 0, smile: 0, blob: 0, frown: 0 };
+    const pvName = POSE_ARG || S.previewPose;
+    if (pvName && POSES[pvName]) {
+      const p = POSES[pvName];
+      eyeL = p.eye;
+      eyeR = p.eyeR || p.eye;
+      mouth = { chev: 0, omega: 0, smile: 0, blob: 0, frown: 0 };
+      for (const mk of MOUTH_KEYS) mouth[mk] = p.mouth[mk] || 0;
+    }
+
+    /* 戳眼时的急促抖动 */
+    S.shakeX = (S.react.kind === 'eye' && S.react.t >= 0)
+      ? Math.sin(S.react.t * 70) * 0.006 * Math.exp(-S.react.t * 9) : 0;
+    if (S.react.kind === 'eye' && S.react.t >= 0) {
+      const pop = 1 + 0.06 * pulse(S.react.t, 0.08, 0.35);
+      eyeL.sc *= pop; eyeR.sc *= pop;
+    }
+
+    /* 视线：幅度要大到一眼能看出来（原来只有 0.10，约 9px，根本看不见）
+       人眼跟随目标是一次快速跳动，所以这里也放快一点 */
+    let gx = 0, gy = 0;
+    if (S.mouseActive) {
+      gx = Math.tanh((S.mouseX - W / 2) / (W * 0.5)) * 0.30;
+      gy = Math.tanh((S.mouseY - H / 2) / (H * 0.5)) * 0.22;
+    }
+
+    /* 手指靠近眼睛 → 触点处凹进去（不是整只眼平移） */
+    {
+      const L2 = layout();
+      const R = L2.er * 3.0;            /* 感知半径 */
+      const pushMax = L2.er * 0.10;     /* 整体只轻微让位 */
+      const tgt = [0, 0, 0, 0];         /* 位移 x,y ×2 */
+      const tDent = [0, 0, 0, 0];       /* 凹陷角、深度 ×2 */
+      for (let i = 0; i < 2; i++) {
+        const side = i === 0 ? -1 : 1;
+        const cx = L2.cx + side * L2.dx;
+        const cy = L2.cy;
+        if (S.mouseActive) {
+          const dx = cx - S.mouseX, dy = cy - S.mouseY;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d < R) {
+            const k = Math.pow(1 - d / R, 1.4);
+            let ux = dx / d, uy = dy / d;
+            if (d < 2) {
+              ux = side; uy = 0.30;
+              const n = Math.hypot(ux, uy) || 1;
+              ux /= n; uy /= n;
+            }
+            tgt[i * 2] = ux * pushMax * k;
+            tgt[i * 2 + 1] = uy * pushMax * k;
+            /* 凹陷方向 = 从眼心指向手指（canvas 坐标，向下为正） */
+            tDent[i * 2] = Math.atan2(S.mouseY - cy, S.mouseX - cx);
+            tDent[i * 2 + 1] = k;
+          }
+        }
+      }
+      const ka = 1 - Math.exp(-16 * dt);
+      S.avLx += (tgt[0] - S.avLx) * ka;
+      S.avLy += (tgt[1] - S.avLy) * ka;
+      S.avRx += (tgt[2] - S.avRx) * ka;
+      S.avRy += (tgt[3] - S.avRy) * ka;
+
+      S.dkL += (tDent[1] - S.dkL) * ka;
+      S.dkR += (tDent[3] - S.dkR) * ka;
+      if (tDent[1] > 0.01) S.dL += (tDent[0] - S.dL) * ka;
+      if (tDent[3] > 0.01) S.dR += (tDent[2] - S.dR) * ka;
+
+      /* 凹陷时别再盯着手指看 */
+      const am = Math.max(S.dkL, S.dkR);
+      if (am > 0.15) { gx *= 0.25; gy *= 0.25; }
+    }
+    if (S.idle.kind === 'look') { gx = (S.gazeX || 0) * 0.28 * idleW; gy = (S.gazeY || 0) * 0.20 * idleW; }
+
+    /* 微倾斜：永远在动 */
+    let tiltT = Math.sin(S.t * 0.41) * 0.004 + Math.sin(S.t * 0.13) * 0.003;
+    if (S.idle.kind === 'tilt') tiltT += Math.sin(S.t * 6) * 0.012 * idleW;
+    if (S.idle.kind === 'squash') { eyeL.sc *= 1 + 0.05 * idleW; eyeR.sc *= 1 + 0.05 * idleW; }
+
+    /* 弹簧 */
+    const SM = TIMING.smooth;
+    const step = (o, k, target) => {
+      o[k] += (target - o[k]) * (1 - Math.exp(-SM.eyeFreq * dt));
+    };
+    const eyeStep = (o, target) => {
+      step(o, 't1', target.t1);
+      step(o, 't2', target.t2);
+      step(o, 'ang', target.ang);
+      step(o, 'sc', target.sc);
+    };
+    eyeStep(S.eL, eyeL);
+    eyeStep(S.eR, eyeR);
+    const f3 = 1 - Math.exp(-SM.lookFreq * dt);
+    S.eyeX += (gx - S.eyeX) * f3;
+    S.eyeY += (gy - S.eyeY) * f3;
+    S.tilt += (tiltT - S.tilt) * (1 - Math.exp(-SM.tiltFreq * dt));
+
+    spr('mOmega', clamp(mouth.omega, 0, 1), dt, SM.omega[0], SM.omega[1]);
+    spr('mBlob', clamp(mouth.blob, 0, 1), dt, SM.blob[0], SM.blob[1]);
+    spr('mSmile', clamp(mouth.smile, 0, 1), dt, SM.smile[0], SM.smile[1]);
+    spr('mFrown', clamp(mouth.frown || 0, 0, 1), dt, SM.smile[0], SM.smile[1]);
+
+    const dimT = S.power === 'AOD' ? TIMING.dim.aod : S.power === 'SLEEP' ? 1 : 0;
+    S.dim += (dimT - S.dim) * (1 - Math.exp(-TIMING.dim.rate * dt));
+  }
+
+  /* ── 绘制 ─────────────────────────────────────────────── */
+  /* 眼睛轮廓：被手指顶住的一侧向内凹（dentK 0..1），否则就是正圆 */
+  function eyePath(er, dentAng, dentK, rot) {
+    const N = 64;
+    const a0 = dentAng - rot;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      let c = Math.cos(a - a0);
+      c = c > 0 ? c : 0;
+      const r = er * (1 - 0.45 * dentK * c * c);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  function drawEye(L, side) {
+    const o = side < 0 ? S.eL : S.eR;
+    const ax = side < 0 ? S.avLx : S.avRx;
+    const ay = side < 0 ? S.avLy : S.avRy;
+    const dentK = side < 0 ? S.dkL : S.dkR;
+    const dentA = side < 0 ? S.dL : S.dR;
+    const ex = L.cx + side * L.dx + S.eyeX * L.er + ax;
+    const ey = L.cy + S.eyeY * L.er + ay;
+    const er = L.er * o.sc;
+
+    /* 眨眼：上眼皮往下压，把"当前形状"压成一条细线（保留它自己的下沿位置）
+       —— 不能跳到固定的闭眼姿态，否则 ∩ 眼会翻成下弦，看起来像眼珠在打转 */
+    const lid = remoteLive() ? 0 : Math.max(S.blinkLid, S.slowBlink || 0);
+    const closedT1 = o.t2 - 0.12;
+    const t1 = o.t1 + (closedT1 - o.t1) * lid;
+    const t2 = o.t2;
+
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.rotate(o.ang);
+    eyePath(er, dentA, dentK, o.ang);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.rect(-er * 2, t1 * er, er * 4, (t2 - t1) * er);
+    ctx.clip();
+    eyePath(er, dentA, dentK, o.ang);
+    ctx.fillStyle = INK;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* 嘴：四种形态统一成「中线 + 厚度 + 圆头端点」的同一拓扑，逐点插值才不会拧
+     端点用半圆收口 —— 平头看起来生硬，圆头才像软笔画出来的 */
+  function mouthPoints(kind) {
+    const n = 22;                     /* 中线采样数（四种形态必须一致） */
+    const spec = {
+      /* chev_peak = 0 时就是一条横杠（O-O 的嘴），>0 是尖角 */
+      chev:  { y: (t) => MOUTH_CHEV_PEAK * (2 * Math.abs(2 * t - 1) - 1), th: () => 0.20 },
+      omega: { y: (t) => -0.20 * Math.cos(2 * Math.PI * t) - 0.02,  th: () => 0.20 },
+      smile: { y: (t) => 0.70 * (1 - 4 * (t - 0.5) * (t - 0.5)) - 0.35, th: () => 0.24 },
+      /* 张嘴：圆角矩形（等宽 + 圆头），比椭圆更像原版那个软团 */
+      blob:  { y: () => 0.06, th: () => 0.95 },
+      /* 撇嘴：中间高、两端低（∩ 形） */
+      frown: { y: (t) => 0.30 - 0.55 * (1 - 4 * (t - 0.5) * (t - 0.5)), th: () => 0.20 },
+    }[kind];
+    const X = (t) => -1 + 2 * t;
+    const p = [];
+
+    for (let i = 0; i < n; i++) {                       /* 上沿：左 → 右 */
+      const t = i / (n - 1);
+      p.push([X(t), spec.y(t) - spec.th(t) / 2]);
+    }
+    {                                                    /* 右端圆头 */
+      const r = spec.th(1) / 2, cy = spec.y(1), cx = X(1);
+      for (let i = 1; i < 8; i++) {
+        const a = -Math.PI / 2 + Math.PI * i / 8;
+        p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+      }
+    }
+    for (let i = n - 1; i >= 0; i--) {                  /* 下沿：右 → 左 */
+      const t = i / (n - 1);
+      p.push([X(t), spec.y(t) + spec.th(t) / 2]);
+    }
+    {                                                    /* 左端圆头 */
+      const r = spec.th(0) / 2, cy = spec.y(0), cx = X(0);
+      for (let i = 1; i < 8; i++) {
+        const a = Math.PI / 2 + Math.PI * i / 8;
+        p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+      }
+    }
+    return p;
+  }
+  const MP = {
+    chev: mouthPoints('chev'), omega: mouthPoints('omega'),
+    smile: mouthPoints('smile'), blob: mouthPoints('blob'),
+    frown: mouthPoints('frown'),
+  };
+  const MOUTH_N = MP.chev.length;
+
+  function drawMouth(L) {
+    const wo = clamp(S.mOmega, 0, 1), wb = clamp(S.mBlob, 0, 1);
+    const ws = clamp(S.mSmile, 0, 1), wf = clamp(S.mFrown || 0, 0, 1);
+    const wc = clamp(1 - Math.max(wo, wb, ws, wf), 0, 1);
+    const sum = (wc + wo + wb + ws + wf) || 1;
+    const mw = L.mw * (1 + (OPT.noStretch ? 0 : 0.10 * wb));
+    const cx = W / 2, cy = L.my + L.mw * 0.10 * wb;
+
+    ctx.beginPath();
+    for (let i = 0; i < MOUTH_N; i++) {
+      const a = MP.chev[i], b = MP.omega[i], c = MP.smile[i], d = MP.blob[i], e = MP.frown[i];
+      const x = (a[0] * wc + b[0] * wo + c[0] * ws + d[0] * wb + e[0] * wf) / sum;
+      const y = (a[1] * wc + b[1] * wo + c[1] * ws + d[1] * wb + e[1] * wf) / sum;
+      if (i === 0) ctx.moveTo(cx + x * mw, cy + y * mw);
+      else ctx.lineTo(cx + x * mw, cy + y * mw);
+    }
+    ctx.closePath();
+    ctx.fillStyle = INK;
+    ctx.fill();
+
+    /* 开心时眼下的灰影 */
+    const blush = smoothstep(S.happy, 0.15, 0.60);
+    if (blush > 0.02) {
+      ctx.save();
+      ctx.globalAlpha = 0.20 * blush;
+      ctx.fillStyle = INK;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(L.cx + side * L.dx + side * L.er * 0.12, L.cy + L.er * 0.95,
+                    L.er * 0.34, L.er * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawFrame() {
+    const L = layout();
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(S.tilt);
+    ctx.translate(-W / 2, -H / 2);
+    ctx.translate(S.shakeX * R, 0);
+
+    drawEye(L, -1);
+    drawEye(L, 1);
+    drawMouth(L);
+
+    ctx.restore();
+
+    /* 调试：触摸点 + 判定圈（正常使用时完全不画） */
+    if (OPT.debugHit) {
+      const L2 = layout();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(90,200,255,.50)';
+      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 1.5;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(L2.cx + side * L2.dx, L2.cy, L2.er * HIT_EYE, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(L2.cx, L2.my, L2.mw * HIT_MOUTH, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (S.mouseActive) {
+        ctx.strokeStyle = 'rgba(255,110,110,.85)';
+        ctx.beginPath();
+        ctx.moveTo(S.mouseX - 11, S.mouseY); ctx.lineTo(S.mouseX + 11, S.mouseY);
+        ctx.moveTo(S.mouseX, S.mouseY - 11); ctx.lineTo(S.mouseX, S.mouseY + 11);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(S.mouseX, S.mouseY, 4.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if (S.dim > 0.001) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(S.dim, 1).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    /* 鼠标端：画一个白色圆点当触控点（触摸屏不画）
+       用 difference 混合：黑底显白、白底显黑，压在任何形状上都看得见 */
+    if ((!IS_TOUCH || DOT_FORCE) && S.mouseActive) {
+      const pressed = S.hold.active;
+      const r = Math.max(7, Math.min(W, H) * 0.010) * (pressed ? 1.35 : 1);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.save();
+      ctx.globalCompositeOperation = 'difference';
+      ctx.globalAlpha = pressed ? 1.0 : 0.85;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(S.mouseX, S.mouseY, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (!pressed) {
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath();
+        ctx.arc(S.mouseX, S.mouseY, r + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /* 调试 HUD（只对开发者可见） */
+    if (OPT.debugHud) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.save();
+      ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.fillStyle = 'rgba(110,240,180,.85)';
+      const lines = [
+        'fps     ' + fpsShown.toFixed(1),
+        'mode    ' + (REMOTE ? 'remote(板子)' : 'local(网页)'),
+        'power   ' + S.power,
+        'anger   ' + S.anger.toFixed(2) + '  happy ' + S.happy.toFixed(2) + '  mood ' + S.mood.toFixed(2),
+        'look    ' + S.eyeX.toFixed(3) + ', ' + S.eyeY.toFixed(3),
+        'avoid   ' + S.avLx.toFixed(0) + ',' + S.avLy.toFixed(0) + '  ' + S.avRx.toFixed(0) + ',' + S.avRy.toFixed(0),
+        'dim     ' + S.dim.toFixed(2),
+      ];
+      lines.forEach((t, i) => ctx.fillText(t, 14, 24 + i * 15));
+      ctx.restore();
+    }
+  }
+
+  /* ── 远程模式（帧协议 17 字段） ────────────────────────── */
+  const REMOTE = /[?&]remote=1/.test(location.search);
+  let pkt = null, lastPktMs = 0;
+  if (REMOTE) {
+    try {
+      const es = new EventSource('/frames');
+      es.onmessage = (ev) => {
+        const p = ev.data.split(',').map(Number);
+        if (p.length >= 18) { pkt = p; lastPktMs = performance.now(); }
+      };
+    } catch (e) { }
+  }
+  /* 板子连着才走远程；收不到帧就自动回落到本地自演，免得点了没反应 */
+  function remoteLive() {
+    return REMOTE && pkt && (performance.now() - lastPktMs < 1500);
+  }
+  function applyRemote() {
+    if (!pkt) return;
+    const v = pkt;
+    if (v.length < 18) return;
+    S.eL.t1 = v[0] / 1000; S.eL.t2 = v[1] / 1000; S.eL.ang = v[2] / 1000;
+    S.eR.t1 = v[3] / 1000; S.eR.t2 = v[4] / 1000; S.eR.ang = v[5] / 1000;
+    S.eL.sc = S.eR.sc = v[6] / 1000;
+    S.mOmega = v[8] / 1000; S.mSmile = v[9] / 1000; S.mBlob = v[10] / 1000;
+    S.mFrown = v[11] / 1000;
+    S.eyeX = v[12] / 1000; S.eyeY = v[13] / 1000;
+    S.tilt = v[14] / 10000; S.shakeX = v[15] / 10000;
+    S.dim = v[16] / 1000;
+    S.power = ['ACTIVE', 'AOD', 'SLEEP'][v[17]] || 'ACTIVE';
+
+    /* 板子自己的动作（晃/倾斜）也出声；但刚点过的 0.7 秒内不重复响 */
+    if (performance.now() - S.lastClickMs > 700) {
+      const blob = v[10], omega = v[8], t2 = Math.min(v[1], v[4]);
+      if (blob > 600 && prevFrame[0] < 300) playSfx('chin');
+      if (omega > 600 && prevFrame[1] < 300) playSfx('head');
+      if (t2 < -150 && prevFrame[2] > 500) playSfx('eye');
+      prevFrame[0] = blob; prevFrame[1] = omega; prevFrame[2] = t2;
+    }
+  }
+  const prevFrame = [0, 0, 1000];
+  function sendCmd(c) { try { fetch('/cmd?c=' + encodeURIComponent(c)); } catch (e) { } }
+
+  /* ── 交互 ─────────────────────────────────────────────── */
+  /* ── 声音：暂时用电脑喇叭代替板载 ES8388
+        等屏和喇叭到了，这些音效改成从板子 I2S 输出 ── */
+  let AC = null;
+  function ensureAudio() {
+    if (!AC) {
+      try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; }
+    }
+    if (AC && AC.state === 'suspended') AC.resume();
+  }
+  function chirp(f0, f1, dur, gain, type) {
+    if (!AC || S.muted) return;
+    const t = AC.currentTime;
+    const o = AC.createOscillator();
+    const g = AC.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  const SFX = {
+    eye:   () => chirp(780, 300, 0.18, 0.10, 'triangle'),          /* 被戳：短促下滑 */
+    head:  () => { chirp(430, 760, 0.15, 0.09, 'sine');             /* 被摸：两声上扬 */
+                   setTimeout(() => chirp(640, 920, 0.13, 0.07, 'sine'), 95); },
+    cheek: () => chirp(520, 700, 0.12, 0.06, 'sine'),
+    chin:  () => chirp(300, 900, 0.22, 0.10, 'square'),            /* 吓到：高冲 */
+    mouth: () => chirp(340, 820, 0.20, 0.09, 'square'),
+  };
+  function playSfx(region) {
+    const f = SFX[region];
+    if (f) f();
+  }
+
+  /* ── 交互：点击 + 持续按住 ─────────────────────────────── */
+  const cmdOf = (r) => r === 'eye' ? 'e' : r === 'head' ? 'h'
+                    : (r === 'chin' || r === 'mouth') ? 'k' : 'c';
+
+  cv.addEventListener('pointerdown', (e) => {
+    const r = regionAt(e.clientX, e.clientY);
+    ensureAudio();
+    playSfx(r);
+    S.hold.active = true;
+    S.hold.region = r;
+    S.hold.x = e.clientX; S.hold.y = e.clientY;
+    S.hold.nextSend = 0;
+    S.mouseX = e.clientX; S.mouseY = e.clientY; S.mouseActive = true;
+    S.lastClickMs = performance.now();
+    if (remoteLive()) { sendCmd(cmdOf(r)); return; }
+    poke(r, e.clientX, e.clientY);
+    hideHint();
+  });
+
+  cv.addEventListener('pointermove', (e) => {
+    S.mouseX = e.clientX; S.mouseY = e.clientY; S.mouseActive = true;
+    if (!S.hold.active) return;
+    S.hold.x = e.clientX; S.hold.y = e.clientY;
+    S.hold.region = regionAt(e.clientX, e.clientY);
+    if (REMOTE) {
+      const now = performance.now();
+      if (now > S.hold.nextSend) {
+        sendCmd(cmdOf(S.hold.region));
+        S.hold.nextSend = now + 300;
+      }
+    }
+  }, { passive: true });
+
+  const endHold = () => {
+    if (S.hold.active) {
+      S.emotionHold = TIMING.linger.afterTouch;   /* 松手后保持 */
+      /* 摸完头：给一个"余韵"——慢慢眨一次眼（猫示好的动作） */
+      if (S.hold.region === 'head' && S.happy > 0.55) S.afterglow = 2.6;
+    }
+    S.hold.active = false;
+  };
+  cv.addEventListener('pointerup', endHold);
+  cv.addEventListener('pointercancel', endHold);
+  document.addEventListener('mouseleave', () => { S.mouseActive = false; endHold(); });
+
+  const hideHint = () => document.getElementById('hint').classList.add('hide');
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k === 'g') {
+      openSettings(!settingsEl.classList.contains('show'));
+    }
+    if (k === 'm') {
+      S.muted = !S.muted;
+      saveSettings();
+      if (!S.muted) { ensureAudio(); chirp(600, 700, 0.08, 0.06, 'sine'); }
+    }
+    if (k === 'p' && OPT.dev) {
+      /* 开发者：逐个预览全部姿态 */
+      const names = Object.keys(POSES);
+      const i = names.indexOf(S.previewPose);
+      S.previewPose = (i < 0) ? names[0] : (i + 1 >= names.length ? '' : names[i + 1]);
+      console.log('[预览]', S.previewPose || '关闭');
+    }
+    if (OPT.dev) {
+      /* 开发者：模拟传感器事件（没接板子时用） 1=拿起 2=摇晃 3=遮光 */
+      if (k === '1') sensorEvent('pickup');
+      if (k === '2') sensorEvent('shake');
+      if (k === '3') sensorEvent('cover');
+    }
+  });
+
+  /* ── 设置页 + 动画演示 ─────────────────────────────────── */
+  const OPT = { lock: false, moodStatic: false, noStretch: false, noWink: false, noSleep: false,
+                debugHit: false, debugHud: false, dev: false };
+  const settingsEl = document.getElementById('settings');
+
+  function syncOpts() {
+    document.querySelectorAll('.opt').forEach((el) => {
+      el.classList.toggle('checked', !!OPT[el.dataset.k]);
+    });
+    cv.classList.toggle('debug', !!OPT.debugHit);
+    settingsEl.classList.toggle('dev', !!OPT.dev);
+  }
+  /* 设置持久化：刷新/关掉页面都不丢 */
+  const SET_KEY = 'o-o.settings.v1';
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SET_KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      if (o.opt) {
+        for (const k in OPT) {
+          if (k in o.opt) OPT[k] = !!o.opt[k];
+        }
+      }
+      if (typeof o.mood === 'number') {
+        S.mood = o.mood;
+        document.getElementById('mood').value = String(Math.round(o.mood * 100));
+      }
+      if (typeof o.muted === 'boolean') S.muted = o.muted;
+    } catch (e) { }
+  }
+  function saveSettings() {
+    try {
+      localStorage.setItem(SET_KEY, JSON.stringify({ opt: OPT, mood: S.mood, muted: S.muted }));
+    } catch (e) { }
+  }
+
+  document.querySelectorAll('.opt').forEach((el) => {
+    el.addEventListener('click', () => {
+      OPT[el.dataset.k] = !OPT[el.dataset.k];
+      if (el.dataset.k === 'lock' && OPT.lock) { S.anger = 0; S.happy = 0; S.surprise = 0; }
+      syncOpts();
+      saveSettings();
+    });
+  });
+  document.getElementById('mood').addEventListener('input', (e) => {
+    S.mood = parseFloat(e.target.value) / 100;
+    saveSettings();
+  });
+  loadSettings();
+  syncOpts();
+
+  /* ── 待机时间表横条（按真实秒数比例分段） ── */
+  (function buildTimeline() {
+    const bar = document.getElementById('tlbar');
+    if (!bar || typeof TIMELINE === 'undefined') return;
+    const fmt = (s) => s < 60 ? (s + 's') : (s % 60 === 0 ? (s / 60) + '分' : Math.floor(s / 60) + '分' + (s % 60) + '秒');
+    const stages = [
+      { name: '清醒',   from: 0,                     color: '#e8e6f0' },
+      { name: '犯困',   from: TIMELINE.sleepy_after, color: '#c9c5da' },
+      { name: '睡着',   from: TIMELINE.asleep_after, color: '#a8a3bd' },
+      { name: '压暗',   from: TIMELINE.aod_after,    color: '#87829c' },
+      { name: '休眠',   from: TIMELINE.sleep_after,  color: '#666179' },
+    ];
+    const total = TIMELINE.sleep_after * 1.15;
+    const segs = [];
+    for (let i = 0; i < stages.length; i++) {
+      const start = stages[i].from;
+      const end = (i + 1 < stages.length) ? stages[i + 1].from : total;
+      const dur = Math.max(1, end - start);
+      const seg = document.createElement('div');
+      seg.className = 'tlseg';
+      seg.style.flex = String(dur);
+      seg.style.background = stages[i].color;
+      seg.textContent = stages[i].name;
+      seg.title = stages[i].name + '：' + fmt(start) + ' 起（持续约 ' + fmt(dur) + '）';
+      bar.appendChild(seg);
+      segs.push(seg);
+    }
+    /* 太窄的那段不显示文字，避免挤在一起 */
+    setTimeout(() => {
+      for (const seg of segs) {
+        if (seg.clientWidth && seg.clientWidth < 44) seg.textContent = '';
+      }
+    }, 60);
+    const note = document.createElement('div');
+    note.className = 'tlnote';
+    note.textContent = '犯困 ' + fmt(TIMELINE.sleepy_after) + ' · 睡着 ' + fmt(TIMELINE.asleep_after) +
+                       ' · 压暗 ' + fmt(TIMELINE.aod_after) + ' · 休眠 ' + fmt(TIMELINE.sleep_after) +
+                       '（任何触摸都会重置）';
+    bar.parentNode.appendChild(note);
+  })();
+
+  function openSettings(v) {
+    S.settingsOpen = !!v;
+    settingsEl.classList.toggle('show', v);
+    document.getElementById('btn').classList.toggle('on', v);
+  }
+  /* ── 入口：右下三个点 = 设置；设置页里藏的圆点 = 开发者 ── */
+  const btnEl = document.getElementById('btn');
+
+  function toggleDev() {
+    OPT.dev = !OPT.dev;
+    if (!OPT.dev) { OPT.debugHit = false; OPT.debugHud = false; }  /* 退出时把调试视图一起关掉 */
+    syncOpts();
+    saveSettings();
+    if (OPT.dev) {
+      openSettings(true);
+    }
+  }
+
+  btnEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openSettings(!settingsEl.classList.contains('show'));
+  });
+
+  /* 藏点：长按 10 秒才进开发者模式（进度用 rAF 逐帧驱动，不依赖 CSS 过渡时序） */
+  const devDot = document.getElementById('devdot');
+  const DEV_HOLD_MS = 10000;
+  let devTimer = null, devRaf = 0, devStart = 0;
+
+  function devReset() {
+    if (devTimer) { clearTimeout(devTimer); devTimer = null; }
+    if (devRaf) { cancelAnimationFrame(devRaf); devRaf = 0; }
+    devDot.style.opacity = '';
+    devDot.style.transform = '';
+    devDot.classList.remove('holding', 'done');
+  }
+
+  function devTick() {
+    const p = Math.min(1, (performance.now() - devStart) / DEV_HOLD_MS);
+    devDot.style.opacity = String(0.05 + 0.90 * p);
+    devDot.style.transform = 'scale(' + (1 + 1.1 * p).toFixed(3) + ')';
+    if (p >= 1) {
+      devRaf = 0;
+      devDot.classList.add('done');
+      setTimeout(devReset, 320);
+      toggleDev();
+      return;
+    }
+    devRaf = requestAnimationFrame(devTick);
+  }
+
+  devDot.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    devReset();
+    devStart = performance.now();
+    devDot.classList.add('holding');
+    devTick();
+    devTimer = setTimeout(() => { devTimer = null; }, DEV_HOLD_MS + 1000);
+  });
+  devDot.addEventListener('pointerup', devReset);
+  devDot.addEventListener('pointercancel', devReset);
+  devDot.addEventListener('pointerleave', devReset);
+
+  document.getElementById('btnClose').addEventListener('click', () => openSettings(false));
+
+  /* ── 圆周对比测试：?circle=<0..1>
+        把虚拟手指固定在以脸心为圆心、1.6×眼半径为半径的圆周某处，
+        冻结情绪与空闲动作，只对比"手指靠近时眼睛的形变" ── */
+  const CIRCLE = (() => {
+    const m = /[?&]circle=([-\d.]+)/.exec(location.search);
+    return m ? parseFloat(m[1]) : NaN;
+  })();
+
+  /* ?pose=<名字> 强制显示某个姿态（预览/截图用） */
+  const POSE_ARG = (() => {
+    const m = /[?&]pose=([a-z]+)/.exec(location.search);
+    return m ? m[1] : '';
+  })();
+
+  /* ?still=1 —— 冻结一切动画，用于截图比对 */
+  const STILL = /[?&]still=1/.test(location.search);
+
+  /* ?lid=0..1 —— 钉住眼皮闭合度（截图验证闭眼形态用） */
+  const LID_ARG = (() => {
+    const m = /[?&]lid=([\d.]+)/.exec(location.search);
+    return m ? parseFloat(m[1]) : NaN;
+  })();
+
+  /* ?dot=1 —— 强制显示触控白点（调试用） */
+  const DOT_FORCE = /[?&]dot=1/.test(location.search);
+
+  /* ?settings=1 直接打开设置页（截图/调试用） */
+  if (/[?&]settings=1/.test(location.search)) {
+    setTimeout(() => openSettings(true), 60);
+  }
+
+  /* ── 主循环 ───────────────────────────────────────────── */
+  let last = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (!last) { last = now; return; }
+    let dt = (now - last) / 1000;
+    if (dt > 0.1) dt = 0.1;
+    last = now;
+    fpsAcc += dt; fpsN++;
+    if (fpsAcc >= 0.5) { fpsShown = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+
+    if (!isNaN(CIRCLE)) {      const LC = layout();
+      const a = CIRCLE * Math.PI * 2;
+      S.mouseActive = true;
+      S.mouseX = LC.cx + Math.cos(a) * LC.er * 1.6;
+      S.mouseY = LC.cy + Math.sin(a) * LC.er * 1.6;
+      S.anger = 0; S.happy = 0; S.surprise = 0;
+      S.idle.t = -1; S.idle.next = 1e9;
+      S.blinkT = -1; S.blinkLid = 0;
+      S.react.t = -1;
+    }
+
+    if (STILL) {
+      S.mouseActive = false;
+      S.anger = 0; S.happy = 0; S.surprise = 0;
+      S.idle.t = -1; S.idle.next = 1e9;
+      S.blinkT = -1; S.blinkLid = 0;
+      S.react.t = -1;
+      S.lastInput = S.t;
+    }
+
+    update(dt);
+    if (remoteLive()) applyRemote();
+    if (!isNaN(LID_ARG)) S.slowBlink = LID_ARG;
+    drawFrame();
+  }
+
+  resize();
+  requestAnimationFrame(loop);
+  if (STILL || POSE_ARG || !isNaN(CIRCLE)) {
+    document.getElementById('hint').style.display = 'none';
+    document.getElementById('btn').style.display = 'none';
+  } else {
+    setTimeout(hideHint, 7000);
+  }
+
+  /* 自动化测试钩子 */
+  window.__oo = { S, CFG, update, layout, poke, regionAt, drawFrame, POSES, startIdle, openSettings, sensorEvent };
+})();
+</script>
+</body>
+</html>

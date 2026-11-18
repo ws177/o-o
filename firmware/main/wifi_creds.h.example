@@ -1,0 +1,6 @@
+// wifi_creds.h — 把本文件复制成 wifi_creds.h 并填入自己的 2.4G 热点
+// wifi_creds.h 已被 .gitignore 忽略，不会被提交
+#pragma once
+
+#define WIFI_SSID  "your-ssid"
+#define WIFI_PASS  "your-password"
